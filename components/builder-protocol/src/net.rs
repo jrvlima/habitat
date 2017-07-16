@@ -15,17 +15,22 @@
 use std::error;
 use std::fmt;
 use std::result;
+use std::str::FromStr;
 
 use protobuf::core::ProtobufEnum;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 
-pub use message::net::*;
+pub use message::{ErrCode, Message, NetError, NetOk, Protocol, RouteInfo, Txn};
+use error::ProtocolError;
 
-pub fn err<M: Into<String>>(code: ErrCode, msg: M) -> NetError {
+pub fn err<M>(code: ErrCode, msg: M) -> NetError
+where
+    M: ToString,
+{
     let mut err = NetError::new();
     err.set_code(code);
-    err.set_msg(msg.into());
+    err.set_msg(msg.to_string());
     err
 }
 
@@ -56,6 +61,9 @@ impl error::Error for NetError {
             ErrCode::VCS_CLONE => "Worker runner unable to retrieve project source to build.",
             ErrCode::BUILD => "Worker runner failed to build project.",
             ErrCode::POST_PROCESSOR => "One or more post processing step failed in Worker runner.",
+            ErrCode::REG_CONFLICT => {
+                "Service registration rejected by RouteSrv. Conflicting registration."
+            }
         }
     }
 }
@@ -78,5 +86,37 @@ impl Serialize for NetError {
         strukt.serialize_field("code", &self.get_code())?;
         strukt.serialize_field("msg", self.get_msg())?;
         strukt.end()
+    }
+}
+
+impl fmt::Display for Protocol {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // If you add a new value here, you *must* update the `FromStr` implementation for
+        // `Protocol` below.
+        let value = match *self {
+            Protocol::JobSrv => "jobsrv",
+            Protocol::Net => "net",
+            Protocol::RouteSrv => "routesrv",
+            Protocol::SessionSrv => "sessionsrv",
+            Protocol::OriginSrv => "originsrv",
+            Protocol::Scheduler => "scheduler",
+        };
+        write!(f, "{}", value)
+    }
+}
+
+impl FromStr for Protocol {
+    type Err = ProtocolError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_ref() {
+            "jobsrv" => Ok(Protocol::JobSrv),
+            "net" => Ok(Protocol::Net),
+            "routesrv" => Ok(Protocol::RouteSrv),
+            "sessionsrv" => Ok(Protocol::SessionSrv),
+            "originsrv" => Ok(Protocol::OriginSrv),
+            "scheduler" => Ok(Protocol::Scheduler),
+            protocol_id => Err(ProtocolError::NoProtocol(protocol_id.to_string())),
+        }
     }
 }

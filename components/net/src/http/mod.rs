@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod controller;
+// pub mod controller;
 pub mod headers;
-pub mod middleware;
+// pub mod middleware;
 pub mod rendering;
 
 use iron::status::Status;
@@ -40,5 +40,6 @@ pub fn net_err_to_http(err: ErrCode) -> Status {
         ErrCode::VCS_CLONE => Status::BadGateway,
         ErrCode::BUILD => Status::InternalServerError,
         ErrCode::POST_PROCESSOR => Status::InternalServerError,
+        ErrCode::REG_CONFLICT => Status::InternalServerError,
     }
 }

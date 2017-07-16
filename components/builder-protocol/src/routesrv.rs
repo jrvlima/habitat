@@ -13,3 +13,5 @@
 // limitations under the License.
 
 pub use message::routesrv::*;
+
+pub const DEFAULT_ROUTER_PORT: u16 = 5562;

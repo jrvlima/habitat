@@ -26,6 +26,7 @@ use hyper::mime::{Mime, TopLevel, SubLevel};
 use hyper::net::HttpsConnector;
 use hyper_openssl::OpensslClient;
 use protocol::{net, sessionsrv};
+use protocol::message::{ErrCode, NetError};
 use serde_json;
 
 use config;
@@ -81,18 +82,18 @@ impl GitHubClient {
                         Ok(msg.access_token)
                     } else {
                         let msg = format!("Missing OAuth scope(s), '{}'", missing.join(", "));
-                        let err = net::err(net::ErrCode::AUTH_SCOPE, msg);
+                        let err = net::err(ErrCode::AUTH_SCOPE, msg);
                         Err(Error::from(err))
                     }
                 }
                 Err(_) => {
                     match serde_json::from_str::<AuthErr>(&encoded) {
                         Ok(gh_err) => {
-                            let err = net::err(net::ErrCode::ACCESS_DENIED, gh_err.error);
+                            let err = net::err(ErrCode::ACCESS_DENIED, gh_err.error);
                             Err(Error::from(err))
                         }
                         Err(_) => {
-                            let err = net::err(net::ErrCode::BAD_REMOTE_REPLY, "net:github:0");
+                            let err = net::err(ErrCode::BAD_REMOTE_REPLY, "net:github:0");
                             Err(Error::from(err))
                         }
                     }
@@ -455,7 +456,7 @@ pub enum AuthResp {
     AuthErr,
 }
 
-fn http_get(url: Url, token: &str) -> StdResult<hyper::client::response::Response, net::NetError> {
+fn http_get(url: Url, token: &str) -> StdResult<hyper::client::response::Response, NetError> {
     hyper_client()
         .get(url)
         .header(Accept(vec![
@@ -469,7 +470,7 @@ fn http_get(url: Url, token: &str) -> StdResult<hyper::client::response::Respons
         .map_err(hyper_to_net_err)
 }
 
-fn http_post(url: Url) -> StdResult<hyper::client::response::Response, net::NetError> {
+fn http_post(url: Url) -> StdResult<hyper::client::response::Response, NetError> {
     hyper_client()
         .post(url)
         .header(Accept(vec![
@@ -491,6 +492,6 @@ fn hyper_client() -> hyper::Client {
     client
 }
 
-fn hyper_to_net_err(err: hyper::error::Error) -> net::NetError {
-    net::err(net::ErrCode::BAD_REMOTE_REPLY, err.description())
+fn hyper_to_net_err(err: hyper::error::Error) -> NetError {
+    net::err(ErrCode::BAD_REMOTE_REPLY, err.description())
 }

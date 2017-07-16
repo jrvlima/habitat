@@ -20,22 +20,24 @@ use std::result;
 
 use hyper;
 use protobuf;
-use protocol::net;
+use protocol::{self, net};
 use serde_json;
 use zmq;
 
+use conn;
 use oauth;
 
 #[derive(Debug)]
 pub enum Error {
     Auth(oauth::github::AuthErr),
+    Connection(conn::ConnErr),
     GitHubAPI(hyper::status::StatusCode, HashMap<String, String>),
     IO(io::Error),
     Json(serde_json::Error),
-    MaxHops,
     Net(net::NetError),
     HTTP(hyper::status::StatusCode),
     Protobuf(protobuf::ProtobufError),
+    Protocol(protocol::ProtocolError),
     RequiredConfigField(&'static str),
     Sys,
     Zmq(zmq::Error),
@@ -47,13 +49,14 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = match *self {
             Error::Auth(ref e) => format!("GitHub Authentication error, {}", e),
+            Error::Connection(ref e) => format!("{}", e),
             Error::GitHubAPI(ref c, ref m) => format!("[{}] {:?}", c, m),
             Error::HTTP(ref e) => format!("{}", e),
             Error::IO(ref e) => format!("{}", e),
             Error::Json(ref e) => format!("{}", e),
-            Error::MaxHops => format!("Received a message containing too many network hops"),
             Error::Net(ref e) => format!("{}", e),
             Error::Protobuf(ref e) => format!("{}", e),
+            Error::Protocol(ref e) => format!("{}", e),
             Error::RequiredConfigField(ref e) => {
                 format!("Missing required field in configuration, {}", e)
             }
@@ -68,17 +71,24 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::Auth(_) => "GitHub authorization error.",
+            Error::Connection(ref err) => err.description(),
             Error::GitHubAPI(_, _) => "GitHub API error.",
             Error::IO(ref err) => err.description(),
             Error::HTTP(_) => "Non-200 HTTP response.",
             Error::Json(ref err) => err.description(),
-            Error::MaxHops => "Received a message containing too many network hops",
             Error::Net(ref err) => err.description(),
             Error::Protobuf(ref err) => err.description(),
+            Error::Protocol(ref err) => err.description(),
             Error::RequiredConfigField(_) => "Missing required field in configuration.",
             Error::Sys => "Internal system error",
             Error::Zmq(ref err) => err.description(),
         }
+    }
+}
+
+impl From<conn::ConnErr> for Error {
+    fn from(err: conn::ConnErr) -> Error {
+        Error::Connection(err)
     }
 }
 
@@ -97,6 +107,12 @@ impl From<oauth::github::AuthErr> for Error {
 impl From<protobuf::ProtobufError> for Error {
     fn from(err: protobuf::ProtobufError) -> Error {
         Error::Protobuf(err)
+    }
+}
+
+impl From<protocol::ProtocolError> for Error {
+    fn from(err: protocol::ProtocolError) -> Error {
+        Error::Protocol(err)
     }
 }
 
